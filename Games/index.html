@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Portfolio Projects</title>
+    <!-- Import 8-bit font from Google -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            /* 8-bit Font */
+            font-family: 'Press Start 2P', cursive;
+            
+            /* 8-bit Sky Gradient: Black Space -> Deep Blue -> Sky Blue */
+            background: linear-gradient(to bottom, #000000 0%, #1a1a2e 40%, #16213e 60%, #4da6ff 100%);
+            color: #fff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Scanline effect for retro feel */
+        body::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.25) 50%
+            ), linear-gradient(
+                90deg, 
+                rgba(255, 0, 0, 0.06), 
+                rgba(0, 255, 0, 0.02), 
+                rgba(0, 0, 255, 0.06)
+            );
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        /* --- BACKGROUND ANIMATION OBJECTS --- */
+
+        /* General Star Styles */
+        .stars {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 60%;
+            z-index: -2;
+            image-rendering: pixelated;
+        }
+
+        /* Layer 1: Small stars */
+        .stars-1 {
+            background-image: 
+                radial-gradient(2px 2px at 20px 30px, #fff, rgba(0,0,0,0)),
+                radial-gradient(2px 2px at 40px 70px, #fff, rgba(0,0,0,0)),
+                radial-gradient(2px 2px at 50px 160px, #fff, rgba(0,0,0,0)),
+                radial-gradient(2px 2px at 90px 40px, #fff, rgba(0,0,0,0));
+            background-repeat: repeat;
+            background-size: 200px 200px;
+            /* Slightly faster for more life */
+            animation: twinkle 2.5s infinite alternate; 
+        }
+
+        /* Layer 2: Offset stars */
+        .stars-2 {
+            background-image: 
+                radial-gradient(2px 2px at 150px 50px, #fff, rgba(0,0,0,0)),
+                radial-gradient(2px 2px at 120px 180px, #fff, rgba(0,0,0,0)),
+                radial-gradient(2px 2px at 80px 10px, #fff, rgba(0,0,0,0));
+            background-repeat: repeat;
+            background-size: 250px 250px;
+            /* Slightly faster for more life */
+            animation: twinkle 4s infinite alternate-reverse; 
+            opacity: 0.8;
+        }
+
+        .sky-objects {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .satellite {
+            position: absolute;
+            /* Moved higher to avoid text overlap */
+            top: 5%;
+            font-size: 35px;
+            animation: floatSatellite 12s linear infinite;
+        }
+
+        /* Twinkle Animation: Opacity 0.4 to 1.0 (Increased contrast) */
+        @keyframes twinkle {
+            0% { 
+                opacity: 1; 
+            }
+            100% { 
+                opacity: 0.4; /* Dim enough to twinkle, bright enough to see */
+            }
+        }
+
+        /* Satellite moves from Right (-10%) to Left (110% from right edge) */
+        @keyframes floatSatellite {
+            0% { 
+                right: -10%; 
+                transform: rotate(0deg); 
+            }
+            50% { 
+                transform: rotate(15deg); 
+            }
+            100% { 
+                right: 110%; 
+                transform: rotate(0deg); 
+            }
+        }
+
+        /* --- MAIN CONTENT CARD --- */
+
+        .container {
+            background: transparent; 
+            padding: 2rem;
+            max-width: 700px;
+            width: 90%;
+            text-align: center;
+            z-index: 10;
+        }
+
+        h1 {
+            margin-bottom: 1.5rem;
+            color: #ffff00; /* Arcade Yellow */
+            font-size: 1.5rem;
+            line-height: 1.5;
+            text-shadow: 4px 4px 0px #000000; /* Block shadow */
+            text-transform: uppercase;
+        }
+
+        p {
+            color: #fff;
+            margin-bottom: 3rem;
+            font-size: 0.8rem;
+            line-height: 1.8;
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        .project-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .project-link {
+            display: block;
+            text-decoration: none;
+            background-color: rgba(0, 0, 0, 0.5); 
+            border: 4px solid #fff;
+            padding: 20px;
+            border-radius: 0; 
+            color: #fff;
+            transition: all 0.1s steps(2);
+            text-align: left;
+            position: relative;
+            box-shadow: 6px 6px 0px #000;
+        }
+
+        .project-link:hover {
+            background-color: #fff;
+            color: #000;
+            transform: translate(2px, 2px);
+            box-shadow: 4px 4px 0px #000;
+        }
+
+        .project-link:hover .project-desc {
+            color: #333;
+        }
+
+        .project-name {
+            font-size: 0.9rem;
+            display: block;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .project-desc {
+            font-size: 0.6rem;
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            opacity: 0.9;
+            display: block;
+            line-height: 1.4;
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background Elements -->
+    <div class="stars stars-1"></div>
+    <div class="stars stars-2"></div>
+
+    <div class="sky-objects">
+        <div class="satellite">🛰️</div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container">
+        <h1>Small Project Games</h1>
+        <p>SELECT A PROJECT TO START:</p>
+
+        <div class="project-list">
+            
+            <!-- LINK 1 -->
+            <a href="Wizard_game.html" class="project-link">
+                <span class="project-name">🧙 Wizard Game</span>
+                <span class="project-desc">> LOAD "WIZARD_GAME.EXE"</span>
+            </a>
+
+            <!-- LINK 2 -->
+            <a href="Knight_game.html" class="project-link">
+                <span class="project-name">⚔️ Knight Game</span>
+                <span class="project-desc">> LOAD "KNIGHT_GAME.EXE"</span>
+            </a>
+
+            <!-- LINK 3 -->
+            <a href="Infinite_Climber.html" class="project-link">
+                <span class="project-name">🏔️ Climbing Game</span>
+                <span class="project-desc">> LOAD "CLIMBING_GAME.EXE"</span>
+            </a>
+        </div>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wizard's Last Stand 3D - Arena & Shop</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        /* Global Styling */
+        body {
+            margin: 0;
+            background-color: #111;
+            overflow: hidden;
+            font-family: 'Press Start 2P', cursive;
+            user-select: none;
+        }
+
+        /* HUD Overlay */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            z-index: 10;
+            text-shadow: 2px 2px 0 #000;
+            pointer-events: none;
+        }
+
+        .hud-item {
+            margin-bottom: 10px;
+        }
+
+        #score { color: #64ffda; font-size: 16px; }
+        #gold { color: #ffd700; font-size: 16px; margin-top: 5px; }
+
+        #health-bar-container {
+            margin-top: 10px;
+            width: 200px;
+            height: 10px;
+            background: #333;
+            border: 2px solid #fff;
+        }
+
+        #health-bar {
+            width: 100%;
+            height: 100%;
+            background: #ff5252;
+            transition: width 0.2s;
+        }
+
+        #shop-hint {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            color: #aaa;
+            font-size: 12px;
+            z-index: 10;
+        }
+
+        /* Menu/Game Over Screen */
+        #menu-overlay, #shop-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            color: #fff;
+            text-align: center;
+        }
+
+        #shop-overlay {
+            display: none;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 30;
+        }
+
+        h1 {
+            font-size: 40px;
+            color: #a29bfe;
+            text-shadow: 0 0 20px #6c5ce7;
+            margin-bottom: 10px;
+        }
+
+        h2 { color: #ffd700; margin-bottom: 30px; }
+
+        p {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #ccc;
+            margin-bottom: 30px;
+        }
+
+        .control-key { color: #ff9f43; font-weight: bold; }
+
+        /* Shop Grid */
+        .shop-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .upgrade-card {
+            background: #2d3436;
+            padding: 20px;
+            border: 2px solid #6c5ce7;
+            border-radius: 8px;
+            width: 200px;
+            text-align: center;
+        }
+
+        .upgrade-card h3 { font-size: 14px; margin-bottom: 10px; color: #a29bfe; }
+        .upgrade-card .stat { font-size: 10px; color: #aaa; margin-bottom: 15px; }
+        .upgrade-card .cost { color: #ffd700; margin-bottom: 10px; font-size: 12px; }
+
+        button {
+            background: linear-gradient(45deg, #ff9f43, #ff6b6b);
+            border: none;
+            padding: 15px 30px;
+            color: white;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #c23616;
+            transition: transform 0.1s, box-shadow 0.1s;
+            border-radius: 4px;
+        }
+
+        button:hover { transform: translateY(-2px); box-shadow: 0 7px 0 #c23616; }
+        button:active { transform: translateY(2px); box-shadow: 0 3px 0 #c23616; }
+        button:disabled { background: #555; box-shadow: none; cursor: not-allowed; color: #888; }
+
+        .close-shop-btn { background: #6c5ce7; box-shadow: 0 5px 0 #4834d4; margin-top: 20px;}
+        .close-shop-btn:hover { box-shadow: 0 7px 0 #4834d4; }
+
+        #final-score-display {
+            display: none;
+            margin-bottom: 20px;
+            font-size: 18px;
+            color: #64ffda;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div class="hud-item" id="score">SCORE: 0</div>
+        <div class="hud-item" id="gold">GOLD: 0</div>
+        <div id="health-bar-container">
+            <div id="health-bar"></div>
+        </div>
+    </div>
+
+    <div id="shop-hint">Press [P] to Open Shop</div>
+
+    <!-- Menu Overlay -->
+    <div id="menu-overlay">
+        <h1>WIZARD ARENA 3D</h1>
+        <div id="final-score-display">SCORE: 0</div>
+        <p>
+            <span class="control-key">ARROWS</span> to Move<br>
+            <span class="control-key">SPACE</span> to Jump<br>
+            <span class="control-key">Z</span> to Shoot Fireball<br>
+            <span class="control-key">P</span> to Open Shop
+        </p>
+        <button id="start-btn">Start Battle</button>
+    </div>
+
+    <!-- Shop Overlay -->
+    <div id="shop-overlay">
+        <h2>WIZARD SHOP</h2>
+        <div id="shop-gold-display" style="color: #ffd700; margin-bottom: 20px;">Gold: 0</div>
+        
+        <div class="shop-container">
+            <!-- Fire Rate -->
+            <div class="upgrade-card">
+                <h3>Rapid Fire</h3>
+                <div class="stat">Rate: <span id="stat-rate">1.0</span>s</div>
+                <div class="cost">Cost: <span id="cost-rate">10</span></div>
+                <button id="btn-buy-rate" onclick="buyUpgrade('rate')">Buy</button>
+            </div>
+
+            <!-- Fireball Size -->
+            <div class="upgrade-card">
+                <h3>Big Fire</h3>
+                <div class="stat">Size: <span id="stat-size">Small</span></div>
+                <div class="cost">Cost: <span id="cost-size">15</span></div>
+                <button id="btn-buy-size" onclick="buyUpgrade('size')">Buy</button>
+            </div>
+
+            <!-- Explosion Radius -->
+            <div class="upgrade-card">
+                <h3>Explosion</h3>
+                <div class="stat">Radius: <span id="stat-radius">0</span></div>
+                <div class="cost">Cost: <span id="cost-radius">20</span></div>
+                <button id="btn-buy-radius" onclick="buyUpgrade('radius')">Buy</button>
+            </div>
+        </div>
+
+        <button class="close-shop-btn" id="close-shop-btn">Resume (P)</button>
+    </div>
+
+    <div id="loading">Loading 3D Engine...</div>
+
+    <script>
+    // Expose buy function globally for HTML buttons
+    window.buyUpgrade = null; 
+
+    (function() {
+        // --- Configuration ---
+        const CONFIG = {
+            gravity: 0.025,
+            jumpForce: 0.6,
+            speed: 0.3,
+            fireballSpeed: 0.8,
+            skeletonSpeed: 0.12,
+            floorY: -4,
+            cameraOffset: { y: 20, z: 25 },
+            arenaSize: 60
+        };
+
+        // --- Globals ---
+        let scene, camera, renderer;
+        let wizard, wizardGroup;
+        let entities = { skeletons: [], fireballs: [], particles: [], gold: [] };
+        let score = 0;
+        let gold = 0;
+        let health = 100;
+        let gameActive = false;
+        let isShopOpen = false;
+        let spawnTimer = 0;
+        
+        // Stats & Upgrades
+        let stats = {
+            fireRateDelay: 1000, // ms
+            fireballSize: 0.3,
+            explosionRadius: 0,  // 0 = direct hit only
+            lastShotTime: 0
+        };
+
+        let upgradeCosts = {
+            rate: 10,
+            size: 15,
+            radius: 20
+        };
+
+        let upgradeLevels = {
+            rate: 1,
+            size: 1,
+            radius: 0
+        };
+
+        // Input state
+        let keys = { 
+            ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, 
+            Space: false, KeyZ: false 
+        };
+        let wizardVelocityY = 0;
+
+        // DOM Elements
+        const scoreEl = document.getElementById('score');
+        const goldEl = document.getElementById('gold');
+        const shopGoldEl = document.getElementById('shop-gold-display');
+        const healthBarEl = document.getElementById('health-bar');
+        const menuEl = document.getElementById('menu-overlay');
+        const shopEl = document.getElementById('shop-overlay');
+        const startBtn = document.getElementById('start-btn');
+        const closeShopBtn = document.getElementById('close-shop-btn');
+        const finalScoreEl = document.getElementById('final-score-display');
+        const loadingEl = document.getElementById('loading');
+
+        // --- Initialization ---
+        function init() {
+            loadingEl.style.display = 'none';
+
+            // 1. Setup Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x111122);
+            scene.fog = new THREE.FogExp2(0x111122, 0.025);
+
+            // 2. Setup Camera
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            // 3. Setup Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+
+            // 4. Lighting
+            setupLighting();
+
+            // 5. Environment
+            createEnvironment();
+
+            // 6. Player
+            createWizard();
+
+            // 7. Listeners
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            startBtn.addEventListener('click', startGame);
+            closeShopBtn.addEventListener('click', toggleShop);
+
+            // 8. Start Loop
+            animate();
+        }
+
+        function setupLighting() {
+            const ambientLight = new THREE.AmbientLight(0x404060, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(20, 40, 20);
+            dirLight.castShadow = true;
+            dirLight.shadow.camera.left = -50;
+            dirLight.shadow.camera.right = 50;
+            dirLight.shadow.camera.top = 50;
+            dirLight.shadow.camera.bottom = -50;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            scene.add(dirLight);
+        }
+
+        function createEnvironment() {
+            const planeGeometry = new THREE.PlaneGeometry(150, 150);
+            const planeMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x2d3436, roughness: 0.8, metalness: 0.2 
+            });
+            const floor = new THREE.Mesh(planeGeometry, planeMaterial);
+            floor.rotation.x = -Math.PI / 2;
+            floor.position.y = CONFIG.floorY;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            const gridHelper = new THREE.GridHelper(150, 30, 0x64ffda, 0x2d3436);
+            gridHelper.position.y = CONFIG.floorY + 0.05;
+            scene.add(gridHelper);
+
+            for(let i=0; i<40; i++) {
+                const h = Math.random() * 10 + 5;
+                const geo = new THREE.BoxGeometry(2, h, 2);
+                const mat = new THREE.MeshStandardMaterial({ color: 0x1a1a2e });
+                const pillar = new THREE.Mesh(geo, mat);
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 60 + Math.random() * 30;
+                pillar.position.set(Math.cos(angle) * radius, CONFIG.floorY + h/2, Math.sin(angle) * radius);
+                scene.add(pillar);
+            }
+        }
+
+        function createWizard() {
+            wizardGroup = new THREE.Group();
+
+            const robeMat = new THREE.MeshStandardMaterial({ color: 0x6c5ce7, flatShading: true });
+            const robe = new THREE.Mesh(new THREE.ConeGeometry(0.8, 2.5, 8), robeMat);
+            robe.position.y = 1.25;
+            robe.rotation.y = Math.PI;
+            robe.castShadow = true;
+            wizardGroup.add(robe);
+
+            const skinMat = new THREE.MeshStandardMaterial({ color: 0xffccaa });
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16), skinMat);
+            head.position.y = 2.6;
+            head.castShadow = true;
+            wizardGroup.add(head);
+
+            const hatMat = new THREE.MeshStandardMaterial({ color: 0x2d3436 });
+            const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.1, 10), hatMat);
+            hatBrim.position.y = 2.9;
+            wizardGroup.add(hatBrim);
+            
+            const hatCone = new THREE.Mesh(new THREE.ConeGeometry(0.4, 1.2, 10), hatMat);
+            hatCone.position.y = 3.5;
+            hatCone.rotation.x = -0.2; 
+            wizardGroup.add(hatCone);
+
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const leftEye = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), eyeMat);
+            leftEye.position.set(0.2, 2.7, 0.4); 
+            wizardGroup.add(leftEye);
+            const rightEye = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), eyeMat);
+            rightEye.position.set(-0.2, 2.7, 0.4);
+            wizardGroup.add(rightEye);
+
+            scene.add(wizardGroup);
+            wizard = { mesh: wizardGroup, onGround: true };
+        }
+
+        function spawnSkeleton() {
+            const group = new THREE.Group();
+            const boneMat = new THREE.MeshStandardMaterial({ color: 0xecf0f1 });
+
+            const spine = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.2, 0.4), boneMat);
+            spine.position.y = 1.5;
+            spine.castShadow = true;
+            group.add(spine);
+
+            const skull = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.5), boneMat);
+            skull.position.y = 2.4;
+            skull.castShadow = true;
+            group.add(skull);
+
+            const eyeGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+            eyeL.position.set(0.15, 2.4, 0.26);
+            const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+            eyeR.position.set(-0.15, 2.4, 0.26);
+            group.add(eyeL);
+            group.add(eyeR);
+
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 50;
+            group.position.set(Math.cos(angle) * radius, CONFIG.floorY, Math.sin(angle) * radius);
+            
+            scene.add(group);
+            entities.skeletons.push({ mesh: group, hp: 1, speed: CONFIG.skeletonSpeed });
+        }
+
+        function spawnGold(x, z) {
+            const geo = new THREE.CylinderGeometry(0.3, 0.3, 0.05, 16);
+            const mat = new THREE.MeshStandardMaterial({ 
+                color: 0xffd700, 
+                emissive: 0xffd700, // Makes it glow
+                emissiveIntensity: 2, // How much it glows
+                metalness: 0.8, 
+                roughness: 0.3 
+            });
+            const coin = new THREE.Mesh(geo, mat);
+            
+            coin.position.set(x, CONFIG.floorY + 0.5, z);
+            coin.rotation.x = Math.PI / 2; // Face up initially
+            
+            scene.add(coin);
+            entities.gold.push({ mesh: coin, rotationSpeed: 0.05 });
+        }
+
+        function castFireball() {
+            const now = Date.now();
+            if (now - stats.lastShotTime < stats.fireRateDelay) return;
+            
+            stats.lastShotTime = now;
+
+            const geometry = new THREE.SphereGeometry(stats.fireballSize, 8, 8);
+            const material = new THREE.MeshStandardMaterial({ 
+                color: 0xff7f50, emissive: 0xff4500, emissiveIntensity: 2 
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            
+            const spawnDist = 1.5;
+            const spawnX = wizardGroup.position.x + Math.sin(wizardGroup.rotation.y) * spawnDist;
+            const spawnZ = wizardGroup.position.z + Math.cos(wizardGroup.rotation.y) * spawnDist;
+
+            mesh.position.set(spawnX, wizardGroup.position.y + 2, spawnZ);
+
+            const light = new THREE.PointLight(0xff4500, 2, 10);
+            mesh.add(light);
+
+            scene.add(mesh);
+
+            const vx = Math.sin(wizardGroup.rotation.y) * CONFIG.fireballSpeed;
+            const vz = Math.cos(wizardGroup.rotation.y) * CONFIG.fireballSpeed;
+
+            entities.fireballs.push({ mesh: mesh, velocity: {x: vx, z: vz}, life: 100 });
+        }
+
+        function createExplosion(x, y, z, isAOE) {
+            const particleCount = isAOE ? 15 : 8;
+            const color = isAOE ? 0xff0000 : 0xff9f43;
+            const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+            const mat = new THREE.MeshBasicMaterial({ color: color });
+
+            for (let i = 0; i < particleCount; i++) {
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(x, y, z);
+                const vel = {
+                    x: (Math.random() - 0.5) * 0.4,
+                    y: (Math.random() - 0.5) * 0.4,
+                    z: (Math.random() - 0.5) * 0.4
+                };
+                scene.add(mesh);
+                entities.particles.push({ mesh: mesh, velocity: vel, life: 30 });
+            }
+        }
+
+        // --- Logic ---
+
+        window.buyUpgrade = function(type) {
+            const cost = upgradeCosts[type];
+            if (gold >= cost) {
+                gold -= cost;
+                upgradeLevels[type]++;
+                upgradeCosts[type] = Math.floor(upgradeCosts[type] * 1.5); // Increase cost
+
+                // Apply Stats
+                if (type === 'rate') {
+                    stats.fireRateDelay = Math.max(100, 1000 - (upgradeLevels.rate * 100));
+                } else if (type === 'size') {
+                    stats.fireballSize += 0.1;
+                } else if (type === 'radius') {
+                    stats.explosionRadius += 3;
+                }
+
+                updateShopUI();
+            }
+        };
+
+        function updateShopUI() {
+            goldEl.textContent = "GOLD: " + gold;
+            shopGoldEl.textContent = "Gold: " + gold;
+
+            // Update DOM Elements
+            document.getElementById('stat-rate').textContent = (stats.fireRateDelay / 1000).toFixed(1);
+            document.getElementById('cost-rate').textContent = upgradeCosts.rate;
+            document.getElementById('btn-buy-rate').disabled = gold < upgradeCosts.rate;
+
+            document.getElementById('stat-size').textContent = stats.fireballSize.toFixed(1);
+            document.getElementById('cost-size').textContent = upgradeCosts.size;
+            document.getElementById('btn-buy-size').disabled = gold < upgradeCosts.size;
+
+            document.getElementById('stat-radius').textContent = stats.explosionRadius;
+            document.getElementById('cost-radius').textContent = upgradeCosts.radius;
+            document.getElementById('btn-buy-radius').disabled = gold < upgradeCosts.radius;
+        }
+
+        function toggleShop() {
+            if (!gameActive && isShopOpen === false) return; 
+
+            isShopOpen = !isShopOpen;
+            if (isShopOpen) {
+                updateShopUI();
+                shopEl.style.display = 'flex';
+            } else {
+                shopEl.style.display = 'none';
+            }
+        }
+
+        function resetGame() {
+            score = 0;
+            gold = 0;
+            health = 100;
+            scoreEl.textContent = "SCORE: 0";
+            goldEl.textContent = "GOLD: 0";
+            healthBarEl.style.width = "100%";
+            
+            stats.fireRateDelay = 1000;
+            stats.fireballSize = 0.3;
+            stats.explosionRadius = 0;
+            upgradeCosts = { rate: 10, size: 15, radius: 20 };
+            upgradeLevels = { rate: 1, size: 1, radius: 0 };
+            
+            wizardGroup.position.set(0, CONFIG.floorY, 0);
+            wizardGroup.rotation.y = 0;
+            wizardVelocityY = 0;
+
+            entities.skeletons.forEach(e => scene.remove(e.mesh));
+            entities.fireballs.forEach(e => scene.remove(e.mesh));
+            entities.particles.forEach(e => scene.remove(e.mesh));
+            entities.gold.forEach(e => scene.remove(e.mesh));
+            entities = { skeletons: [], fireballs: [], particles: [], gold: [] };
+
+            spawnTimer = 0;
+        }
+
+        function startGame() {
+            resetGame();
+            menuEl.style.display = 'none';
+            gameActive = true;
+        }
+
+        function gameOver() {
+            gameActive = false;
+            isShopOpen = false;
+            shopEl.style.display = 'none';
+            menuEl.style.display = 'flex';
+            finalScoreEl.style.display = 'block';
+            finalScoreEl.textContent = "FINAL SCORE: " + score;
+            document.querySelector('#menu-overlay h1').textContent = "GAME OVER";
+            startBtn.textContent = "TRY AGAIN";
+        }
+
+        function updateWizard() {
+            let dx = 0;
+            let dz = 0;
+            if (keys.ArrowUp) dz = -1;
+            if (keys.ArrowDown) dz = 1;
+            if (keys.ArrowLeft) dx = -1;
+            if (keys.ArrowRight) dx = 1;
+
+            if (dx !== 0 || dz !== 0) {
+                if (dx !== 0 && dz !== 0) { dx *= 0.707; dz *= 0.707; }
+                wizardGroup.position.x += dx * CONFIG.speed;
+                wizardGroup.position.z += dz * CONFIG.speed;
+                wizardGroup.rotation.y = Math.atan2(dx, dz);
+                wizardGroup.position.y += Math.sin(Date.now() * 0.02) * 0.05;
+            }
+
+            const limit = CONFIG.arenaSize;
+            wizardGroup.position.x = Math.max(-limit, Math.min(limit, wizardGroup.position.x));
+            wizardGroup.position.z = Math.max(-limit, Math.min(limit, wizardGroup.position.z));
+
+            if (keys.Space && wizard.onGround) {
+                wizardVelocityY = CONFIG.jumpForce;
+                wizard.onGround = false;
+            }
+
+            wizardVelocityY -= CONFIG.gravity;
+            wizardGroup.position.y += wizardVelocityY;
+
+            if (wizardGroup.position.y < CONFIG.floorY) {
+                wizardGroup.position.y = CONFIG.floorY;
+                wizardVelocityY = 0;
+                wizard.onGround = true;
+            }
+
+            camera.position.x += (wizardGroup.position.x - camera.position.x) * 0.1;
+            camera.position.z += ((wizardGroup.position.z + CONFIG.cameraOffset.z) - camera.position.z) * 0.1;
+            camera.position.y = CONFIG.cameraOffset.y;
+            camera.lookAt(wizardGroup.position);
+        }
+
+        function updateEntities() {
+            // Spawn Skeletons
+            if (spawnTimer-- <= 0) {
+                spawnSkeleton();
+                spawnTimer = Math.max(30, 80 - (score * 2)); 
+            }
+
+            // Gold logic
+            for (let i = entities.gold.length - 1; i >= 0; i--) {
+                const coin = entities.gold[i];
+                coin.mesh.rotation.z += coin.rotationSpeed; // Spin
+                coin.mesh.rotation.y += coin.rotationSpeed;
+
+                const dist = wizardGroup.position.distanceTo(coin.mesh.position);
+                if (dist < 2.0) {
+                    gold += 1;
+                    goldEl.textContent = "GOLD: " + gold;
+                    scene.remove(coin.mesh);
+                    entities.gold.splice(i, 1);
+                }
+            }
+
+            // Skeleton Logic
+            for (let i = entities.skeletons.length - 1; i >= 0; i--) {
+                const skel = entities.skeletons[i];
+                const mesh = skel.mesh;
+                const dx = wizardGroup.position.x - mesh.position.x;
+                const dz = wizardGroup.position.z - mesh.position.z;
+                const dist = Math.sqrt(dx*dx + dz*dz);
+
+                if (dist > 0.1) {
+                    mesh.position.x += (dx / dist) * skel.speed;
+                    mesh.position.z += (dz / dist) * skel.speed;
+                }
+                mesh.lookAt(wizardGroup.position.x, mesh.position.y, wizardGroup.position.z);
+
+                if (dist < 2.0) {
+                    health -= 1; 
+                    healthBarEl.style.width = health + "%";
+                    if (health <= 0) gameOver();
+                }
+            }
+
+            // Fireball Logic
+            for (let i = entities.fireballs.length - 1; i >= 0; i--) {
+                const ball = entities.fireballs[i];
+                ball.mesh.position.x += ball.velocity.x;
+                ball.mesh.position.z += ball.velocity.z;
+                ball.life--;
+
+                let hit = false;
+                // Check Collisions
+                for (let j = entities.skeletons.length - 1; j >= 0; j--) {
+                    const skel = entities.skeletons[j];
+                    // Larger fireball = larger hit radius
+                    const hitThreshold = 2.0 + stats.fireballSize; 
+                    const dist = ball.mesh.position.distanceTo(skel.mesh.position);
+
+                    if (dist < 4.0) { // Height leniency
+                        const d2d = Math.sqrt(Math.pow(ball.mesh.position.x - skel.mesh.position.x, 2) + Math.pow(ball.mesh.position.z - skel.mesh.position.z, 2));
+                        
+                        if (d2d < hitThreshold) {
+                            // PRIMARY TARGET HIT
+                            spawnGold(skel.mesh.position.x, skel.mesh.position.z);
+                            createExplosion(skel.mesh.position.x, skel.mesh.position.y, skel.mesh.position.z, false);
+                            scene.remove(skel.mesh);
+                            entities.skeletons.splice(j, 1);
+                            score++;
+                            scoreEl.textContent = "SCORE: " + score;
+                            hit = true;
+
+                            // AOE LOGIC
+                            if (stats.explosionRadius > 0) {
+                                createExplosion(ball.mesh.position.x, ball.mesh.position.y, ball.mesh.position.z, true);
+                                // Check all other skeletons
+                                for (let k = entities.skeletons.length - 1; k >= 0; k--) {
+                                    const nearbySkel = entities.skeletons[k];
+                                    const aoeDist = ball.mesh.position.distanceTo(nearbySkel.mesh.position);
+                                    if (aoeDist < stats.explosionRadius) {
+                                        spawnGold(nearbySkel.mesh.position.x, nearbySkel.mesh.position.z);
+                                        createExplosion(nearbySkel.mesh.position.x, nearbySkel.mesh.position.y, nearbySkel.mesh.position.z, false);
+                                        scene.remove(nearbySkel.mesh);
+                                        entities.skeletons.splice(k, 1);
+                                        score++;
+                                    }
+                                }
+                            }
+                            break; // Break out of skeleton loop (j) because fireball hit something
+                        }
+                    }
+                }
+
+                if (hit || ball.life <= 0) {
+                    scene.remove(ball.mesh);
+                    entities.fireballs.splice(i, 1);
+                }
+            }
+
+            // Particles
+            for (let i = entities.particles.length - 1; i >= 0; i--) {
+                const p = entities.particles[i];
+                p.mesh.position.x += p.velocity.x;
+                p.mesh.position.y += p.velocity.y;
+                p.mesh.position.z += p.velocity.z;
+                p.life--;
+                p.mesh.scale.multiplyScalar(0.9);
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    entities.particles.splice(i, 1);
+                }
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (gameActive && !isShopOpen) {
+                updateWizard();
+                updateEntities();
+                // Auto-fire check
+                if (keys.KeyZ) castFireball();
+            }
+            renderer.render(scene, camera);
+        }
+
+        // --- Input ---
+        function onKeyDown(e) {
+            if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) > -1) e.preventDefault();
+            
+            if (e.code === 'KeyP' || e.key === 'p' || e.key === 'P') {
+                toggleShop();
+            } else if (e.code === 'KeyZ' || e.key === 'z' || e.key === 'Z') {
+                keys.KeyZ = true;
+            } else if (keys.hasOwnProperty(e.code)) {
+                keys[e.code] = true;
+            }
+        }
+
+        function onKeyUp(e) {
+            if (e.code === 'KeyZ' || e.key === 'z' || e.key === 'Z') {
+                keys.KeyZ = false;
+            } else if (keys.hasOwnProperty(e.code)) {
+                keys[e.code] = false;
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.onload = init;
+
+    })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Infinite Climber</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #87CEEB; /* Start with Level 1 sky */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        #hud {
+            padding: 20px;
+            color: white;
+            text-shadow: 2px 2px 0 #000;
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        #start-screen, #game-over-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.85);
+            padding: 40px;
+            border-radius: 16px;
+            text-align: center;
+            color: white;
+            pointer-events: auto;
+            border: 2px solid #4a4e69;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            min-width: 280px;
+        }
+
+        h1 { margin-top: 0; color: #ff9f43; }
+        p { margin-bottom: 25px; color: #c8d6e5; }
+        
+        button {
+            background: #ff9f43;
+            border: none;
+            padding: 15px 32px;
+            font-size: 18px;
+            color: #222;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+        }
+
+        button:active { transform: scale(0.95); }
+        button:hover { background: #ffaf40; }
+
+        .hidden { display: none !important; }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div id="hud">
+            <span id="scoreDisplay">Height: 0m</span>
+            <span id="levelDisplay">Level 1</span>
+        </div>
+    </div>
+
+    <div id="start-screen">
+        <h1>Peak Climber</h1>
+        <p>Use <b>Arrow Keys</b> to Move<br><b>Space</b> to Jump</p>
+        <button id="start-btn">Start Climbing</button>
+    </div>
+
+    <div id="game-over-screen" class="hidden">
+        <h1>You Fell!</h1>
+        <p>Max Height: <span id="final-score">0</span>m</p>
+        <button id="restart-btn">Try Again</button>
+    </div>
+
+<script>
+/**
+ * Game Configuration & Physics Constants
+ */
+const CONFIG = {
+    gravity: 0.6,
+    friction: 0.8,
+    moveSpeed: 0.8,
+    maxSpeed: 7,
+    jumpForce: -16,
+    doubleJumpForce: -12, 
+    terminalVelocity: 15,
+    
+    // Level Generation
+    minPlatformWidth: 60,
+    maxPlatformWidth: 140,
+    platformHeight: 20,
+    baseGapY: 80,
+    
+    // Level Design
+    levelInterval: 500 // Meters per level
+};
+
+/**
+ * Game State
+ */
+const state = {
+    isPlaying: false,
+    score: 0,
+    cameraY: 0,
+    level: 1,
+    inputs: { left: false, right: false, jump: false, jumpPressed: false },
+    platforms: [],
+    particles: [],
+    lastTime: 0
+};
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+/**
+ * Resizing
+ */
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+/**
+ * Classes
+ */
+
+class Player {
+    constructor() {
+        this.w = 30;
+        this.h = 45;
+        this.reset();
+    }
+
+    reset() {
+        this.x = canvas.width / 2 - this.w / 2;
+        this.y = canvas.height - 200;
+        this.vx = 0;
+        this.vy = 0;
+        this.onGround = false;
+        this.facingRight = true;
+    }
+
+    update() {
+        // Horizontal Movement
+        if (state.inputs.left) {
+            this.vx -= CONFIG.moveSpeed;
+            this.facingRight = false;
+        }
+        if (state.inputs.right) {
+            this.vx += CONFIG.moveSpeed;
+            this.facingRight = true;
+        }
+
+        // Friction
+        this.vx *= CONFIG.friction;
+
+        // Apply velocities
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Gravity
+        this.vy += CONFIG.gravity;
+        if (this.vy > CONFIG.terminalVelocity) this.vy = CONFIG.terminalVelocity;
+
+        // Jump Logic
+        if (state.inputs.jumpPressed) {
+            if (this.onGround) {
+                this.vy = CONFIG.jumpForce;
+                this.onGround = false;
+                createParticles(this.x + this.w/2, this.y + this.h, 5, '#ddd');
+            }
+            state.inputs.jumpPressed = false;
+        }
+
+        // Screen Boundaries
+        if (this.x + this.w < 0) this.x = canvas.width;
+        else if (this.x > canvas.width) this.x = -this.w;
+
+        // Ground collision check
+        if (this.y + this.h > canvas.height + state.cameraY + 100) {
+            gameOver();
+        }
+    }
+
+    draw(ctx, camY) {
+        const drawY = this.y - camY;
+        
+        ctx.save();
+        ctx.translate(this.x + this.w/2, drawY + this.h/2);
+        
+        const tilt = this.vx * 2; 
+        ctx.rotate(tilt * Math.PI / 180);
+        
+        if (!this.facingRight) ctx.scale(-1, 1);
+
+        // Body (Jacket)
+        ctx.fillStyle = '#e55039';
+        ctx.beginPath();
+        ctx.roundRect(-10, -15, 20, 30, 5);
+        ctx.fill();
+
+        // Head
+        ctx.fillStyle = '#f6b93b';
+        ctx.beginPath();
+        ctx.arc(0, -20, 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Hat/Helmet
+        ctx.fillStyle = '#4a69bd';
+        ctx.beginPath();
+        ctx.arc(0, -22, 9, Math.PI, 0);
+        ctx.fill();
+
+        // Backpack
+        ctx.fillStyle = '#60a3bc';
+        ctx.fillRect(-14, -15, 6, 20);
+
+        // Legs
+        ctx.strokeStyle = '#0c2461';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(-5, 15);
+        ctx.lineTo(-5, 25);
+        ctx.moveTo(5, 15);
+        ctx.lineTo(5 + (Math.abs(this.vx) * 1.5), 25);
+        ctx.stroke();
+
+        // Arms
+        ctx.strokeStyle = '#e55039';
+        ctx.beginPath();
+        ctx.moveTo(0, -5);
+        ctx.lineTo(10, 0);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+}
+
+class Platform {
+    constructor(x, y, w, type) {
+        this.x = x;
+        this.y = y;
+        this.w = w;
+        this.h = CONFIG.platformHeight;
+        this.type = type || 1; 
+    }
+
+    draw(ctx, camY) {
+        const drawY = this.y - camY;
+
+        if (this.type === 1) {
+            // Level 1: Dirt and Grass
+            ctx.fillStyle = '#5D4037'; // Brown Dirt
+            ctx.fillRect(this.x, drawY, this.w, this.h);
+            ctx.fillStyle = '#76FF03'; // Bright Grass
+            ctx.fillRect(this.x, drawY, this.w, 6); 
+            
+        } else if (this.type === 2) {
+            // Level 2: Rugged Mountain (High Contrast Rock)
+            // Changed to be cleaner and distinct from background
+            ctx.fillStyle = '#2d3436'; // Very dark grey base
+            ctx.fillRect(this.x, drawY, this.w, this.h);
+            // Simple highlight
+            ctx.fillStyle = '#636e72'; 
+            ctx.fillRect(this.x + 4, drawY + 4, this.w - 8, this.h - 8);
+
+        } else if (this.type === 3) {
+            // Level 3: Icy Mountain (Snow capped)
+            ctx.fillStyle = '#7f8fa6'; // Stone
+            ctx.fillRect(this.x, drawY, this.w, this.h);
+            
+            // Snow Top
+            ctx.fillStyle = '#f5f6fa';
+            ctx.beginPath();
+            ctx.moveTo(this.x, drawY);
+            ctx.lineTo(this.x + this.w, drawY);
+            ctx.lineTo(this.x + this.w, drawY + 8);
+            for(let i=this.w; i>=0; i-=10) {
+                ctx.lineTo(this.x + i, drawY + 5 + Math.random()*3);
+            }
+            ctx.lineTo(this.x, drawY + 8);
+            ctx.fill();
+
+        } else {
+            // Level 4+: Space Satellite (Metal)
+            ctx.fillStyle = '#b2bec3'; // Silver/Metal
+            ctx.fillRect(this.x, drawY, this.w, this.h);
+            
+            // Tech details (Rivets)
+            ctx.fillStyle = '#2d3436';
+            ctx.beginPath();
+            ctx.arc(this.x + 5, drawY + 5, 2, 0, Math.PI*2);
+            ctx.arc(this.x + this.w - 5, drawY + 5, 2, 0, Math.PI*2);
+            ctx.fill();
+
+            // Solar Strip
+            ctx.fillStyle = '#0984e3';
+            ctx.fillRect(this.x + 10, drawY + 6, this.w - 20, 4);
+        }
+    }
+}
+
+class Particle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 4;
+        this.vy = (Math.random() - 0.5) * 4;
+        this.life = 1.0;
+        this.color = color;
+        this.size = Math.random() * 3 + 2;
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= 0.05;
+        this.vy += 0.1; 
+    }
+    draw(ctx, camY) {
+        ctx.globalAlpha = this.life;
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y - camY, this.size, this.size);
+        ctx.globalAlpha = 1;
+    }
+}
+
+/**
+ * Systems
+ */
+
+const player = new Player();
+
+function createParticles(x, y, count, color) {
+    for(let i=0; i<count; i++) {
+        state.particles.push(new Particle(x, y, color));
+    }
+}
+
+function generatePlatforms() {
+    // Generate initial platform under player
+    if (state.platforms.length === 0) {
+        state.platforms.push(new Platform(canvas.width/2 - 100, canvas.height - 100, 200, 1));
+    }
+
+    let highest = state.platforms[state.platforms.length - 1];
+    
+    // While the highest platform is within generation distance
+    while (highest.y > state.cameraY - canvas.height) {
+        
+        // --- Platform Generation Logic ---
+        const absoluteMaxH = (CONFIG.jumpForce * CONFIG.jumpForce) / (2 * CONFIG.gravity);
+        
+        // 1. Difficulty Scaling (affects platform width only)
+        // Cap difficulty at 1.0
+        const difficulty = Math.min(state.score / 5000, 1); 
+        
+        // 2. Determine Platform Type based on Height
+        const nextHeightMeters = (canvas.height - 200 - highest.y) / 10;
+        let type = 1;
+        if (nextHeightMeters >= 1500) type = 4;
+        else if (nextHeightMeters >= 1000) type = 3;
+        else if (nextHeightMeters >= 500) type = 2;
+
+        const width = CONFIG.maxPlatformWidth - (difficulty * (CONFIG.maxPlatformWidth - CONFIG.minPlatformWidth));
+        
+        // 3. Easy Physics Constraints
+        const safeMaxH = absoluteMaxH * 0.6; // 60% of max physics height
+        const minDistY = 60; 
+        
+        const yGap = minDistY + (Math.random() * (safeMaxH - minDistY));
+        const newY = highest.y - yGap;
+
+        // 4. Horizontal Reach
+        const discriminant = (CONFIG.jumpForce * CONFIG.jumpForce) - (2 * CONFIG.gravity * yGap);
+        let maxReachX = 0;
+        
+        if (discriminant >= 0) {
+            const timeInAir = (Math.abs(CONFIG.jumpForce) + Math.sqrt(discriminant)) / CONFIG.gravity;
+            maxReachX = (CONFIG.maxSpeed * timeInAir) * 0.5; // 50% Safety factor
+        } else {
+             maxReachX = 100;
+        }
+
+        const maxDist = maxReachX; 
+        let newX = Math.random() * (canvas.width - width);
+        
+        if (newX + width < highest.x - maxDist) {
+            newX = highest.x - maxDist - width;
+        }
+        if (newX > highest.x + highest.w + maxDist) {
+            newX = highest.x + highest.w + maxDist;
+        }
+
+        if (newX < 0) newX = 0;
+        if (newX + width > canvas.width) newX = canvas.width - width;
+
+        const p = new Platform(newX, newY, width, type);
+        state.platforms.push(p);
+        highest = p;
+    }
+
+    state.platforms = state.platforms.filter(p => p.y < state.cameraY + canvas.height + 100);
+}
+
+function checkCollisions() {
+    if (player.vy > 0) {
+        for (let p of state.platforms) {
+            const feet = player.y + player.h;
+            
+            if (feet >= p.y && feet <= p.y + 20 && 
+                player.x + player.w > p.x + 10 && 
+                player.x < p.x + p.w - 10) {
+                
+                player.y = p.y - player.h;
+                player.vy = 0;
+                player.onGround = true;
+                
+                if (player.vy > 5) createParticles(player.x + player.w/2, feet, 3, '#fff');
+                break; 
+            }
+        }
+    }
+}
+
+function updateCamera() {
+    const targetY = player.y - canvas.height * 0.6;
+    if (targetY < state.cameraY) {
+        state.cameraY = targetY;
+    }
+}
+
+function drawBackground(ctx, level) {
+    if (level === 1) {
+        // Level 1: Ground/Daylight
+        ctx.fillStyle = '#87CEEB';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Sun
+        ctx.fillStyle = '#FFD700';
+        ctx.beginPath();
+        ctx.arc(canvas.width - 50, 50, 40, 0, Math.PI*2);
+        ctx.fill();
+
+    } else if (level === 2) {
+        // Level 2: Rugged Mountain (Clearer View)
+        // Lighter sky to separate from dark platforms
+        ctx.fillStyle = '#b2c2cf'; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Distant Peaks - Lower and softer to avoid visual clutter
+        ctx.fillStyle = '#8395a7';
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height);
+        ctx.lineTo(canvas.width * 0.25, canvas.height - 150);
+        ctx.lineTo(canvas.width * 0.5, canvas.height - 80);
+        ctx.lineTo(canvas.width * 0.8, canvas.height - 200);
+        ctx.lineTo(canvas.width, canvas.height);
+        ctx.fill();
+
+    } else if (level === 3) {
+        // Level 3: Icy (Cold Blue)
+        ctx.fillStyle = '#dff9fb';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Foggy bottom
+        const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        grad.addColorStop(0, '#c7ecee');
+        grad.addColorStop(1, '#95afc0');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    } else {
+        // Level 4: Space
+        ctx.fillStyle = '#0a0a12';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Stars
+        ctx.fillStyle = '#ffffff';
+        // Simple deterministic stars based on screen coordinates to avoid flickering
+        // We just draw a fixed pattern
+        for(let i=0; i<30; i++) {
+            const x = (i * 137) % canvas.width;
+            const y = (i * 243) % canvas.height;
+            ctx.fillRect(x, y, 2, 2);
+        }
+    }
+}
+
+function gameLoop(timestamp) {
+    if (!state.isPlaying) return;
+
+    // Logic
+    player.update();
+    checkCollisions();
+    updateCamera();
+    
+    // Score & Level Logic
+    const currentHeight = Math.floor((canvas.height - 200 - player.y) / 10);
+    if (currentHeight > state.score) state.score = currentHeight;
+    
+    state.level = 1 + Math.floor(state.score / CONFIG.levelInterval);
+    if (state.level > 4) state.level = 4; // Cap visual style at 4 for now
+
+    // Generation
+    generatePlatforms();
+
+    // Particles
+    state.particles.forEach((p, index) => {
+        p.update();
+        if (p.life <= 0) state.particles.splice(index, 1);
+    });
+
+    // --- Drawing ---
+    
+    // 1. Background
+    drawBackground(ctx, state.level);
+
+    // 2. Entities
+    state.platforms.forEach(p => p.draw(ctx, state.cameraY));
+    player.draw(ctx, state.cameraY);
+    state.particles.forEach(p => p.draw(ctx, state.cameraY));
+
+    // 3. HUD
+    document.getElementById('scoreDisplay').innerText = `Height: ${state.score}m`;
+    document.getElementById('levelDisplay').innerText = `Level ${state.level}`;
+
+    requestAnimationFrame(gameLoop);
+}
+
+function startGame() {
+    state.platforms = [];
+    state.particles = [];
+    state.score = 0;
+    state.level = 1;
+    state.cameraY = 0;
+    
+    player.reset();
+    state.cameraY = player.y - canvas.height * 0.6;
+
+    generatePlatforms();
+    
+    state.isPlaying = true;
+    document.getElementById('start-screen').classList.add('hidden');
+    document.getElementById('game-over-screen').classList.add('hidden');
+    requestAnimationFrame(gameLoop);
+}
+
+function gameOver() {
+    state.isPlaying = false;
+    document.getElementById('final-score').innerText = state.score;
+    document.getElementById('game-over-screen').classList.remove('hidden');
+}
+
+/**
+ * Input Handling
+ */
+
+function handleKey(e, isDown) {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') state.inputs.left = isDown;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') state.inputs.right = isDown;
+    if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+        state.inputs.jump = isDown;
+        if (isDown) state.inputs.jumpPressed = true;
+    }
+}
+
+window.addEventListener('keydown', (e) => handleKey(e, true));
+window.addEventListener('keyup', (e) => handleKey(e, false));
+
+// Button Listeners
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('restart-btn').addEventListener('click', startGame);
+
+</script>
+</body>
+</html>
