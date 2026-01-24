@@ -36,7 +36,7 @@ Flight Dynamics Analysis Tool
 A custom learning tool designed to visualize the movement and interaction of an F-22 model with the flight dynamics forces, moments, and derivatives.
 
 Propulsion Modeling and Envoronmental Factoring Tool  
-In Development A custom tool designed to output engine efficiency base off of environmental factors due to location in the world.  
+(In Development) A custom tool designed to output engine efficiency base off of environmental factors due to location in the world.  
 Goal: take into account real temperature data and altitude as well as other factors like coastal and city proximity for salt concentration and other pollutants in the air. 
 
 Academic Projects  
