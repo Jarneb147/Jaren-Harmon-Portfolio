@@ -29,6 +29,8 @@ Web/Graphics: HTML, CSS, Three.js (3D Graphics)
 
 Tools: Git, VS Code
 
+---
+
 🚀 Featured Engineering Projects
 Argonia Cup Rocket - Propulsion Lead
 August 2025 – Present Leading the propulsion design for a two-stage high-powered rocket targeting an apogee of 27,000 ft.
@@ -57,6 +59,8 @@ The Build: Designed the mechanical feeding system in SolidWorks, utilizing gear-
 
 The Impact: Reduced cycle time from 30 minutes to 5 minutes—a 500% efficiency increase.
 
+---
+
 💻 Software & Creative Projects
 Flight Dynamics Analysis Tool
 In Development A custom propulsion analysis program built to automate complex calculations for Flight Dynamics coursework. This tool replaces manual spreadsheet analysis with a programmatic approach to stability and control derivatives.
@@ -69,6 +73,8 @@ I build interactive 3D and 2D experiences using JavaScript and Three.js to explo
 FPS Knight: A first-person perspective game implementing custom movement mechanics.
 
 2D Platformers: Various experiments with collision detection and level design.
+
+---
 
 📬 Connect
 
