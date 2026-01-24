@@ -20,12 +20,12 @@ CFD/Sim: ANSYS Fluent, OpenRocket, RasAero, Advanced Aircraft Analysis (AAA)
 
 Hardware: Arduino, Microcontrollers, Wireless Mesh Networks 
 
-Programming & Development
-
 
 Languages: MATLAB, Python, C++, JavaScript 
 
+
 Web/Graphics: HTML, CSS, Three.js (3D Graphics)
+
 
 Tools: Git, VS Code
 
