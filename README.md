@@ -4,7 +4,9 @@ Aerospace Engineer | CAD Designer | Creative Technologist
 
 I am an Aerospace Engineering student at the University of Kansas (Class of '27) with a passion for propulsion, flight dynamics, and interactive software. I don't just design systems; I build the tools to analyze them and the interfaces to showcase them. 
 
-Currently, I'm specializing in propulsion system design and high-fidelity simulations, while teaching myself full-stack development to bridge the gap between physical engineering and digital tools. ---
+Currently, I'm specializing in propulsion system design and high-fidelity simulations, while teaching myself full-stack development to bridge the gap between physical engineering and digital tools. 
+
+---
 
 🛠 Tools & Technologies
 Engineering & Analysis
