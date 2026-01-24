@@ -42,7 +42,7 @@ Goal: take into account real temperature data and altitude as well as other fact
 Academic Projects
 Misc. academic projects for lectures and team based assignments.
 
-Web-Based Game Development /n
+Web-Based Game Development \n
 I build interactive 3D and 2D experiences using JavaScript and Three.js to explore physics engines and graphics rendering.
 
 3D Wizard Arena: A browser-based 3D combat-upgrade game.
